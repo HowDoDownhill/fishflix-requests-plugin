@@ -33,7 +33,7 @@ jobs:
           fi
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "ABI=$(grep -oP '(?<=^targetAbi: ")[^"]+' build.yaml)" >> "$GITHUB_ENV"
-          echo "ZIP=fishflix-requests_$VERSION.zip" >> "$GITHUB_ENV"
+          echo "PLUGIN_ZIP=fishflix-requests_$VERSION.zip" >> "$GITHUB_ENV"
 
       - name: Test
         run: dotnet test Jellyfin.Plugin.FishflixRequests.slnx --configuration Release
@@ -45,6 +45,7 @@ jobs:
           -p:Version=$VERSION -p:AssemblyVersion=$VERSION -p:FileVersion=$VERSION
 
       - name: Package
+        # Note: don't name a variable ZIP; the zip tool reads it as extra options.
         run: |
           mkdir -p package
           cp publish/Jellyfin.Plugin.FishflixRequests.dll package/
@@ -65,25 +66,28 @@ jobs:
             "assemblies": ["Jellyfin.Plugin.FishflixRequests.dll"]
           }
           JSON
-          (cd package && zip -r "../$ZIP" .)
+          (cd package && zip -r "../$PLUGIN_ZIP" .)
 
       - uses: actions/upload-artifact@v4
         with:
           name: fishflix-requests
-          path: ${{ env.ZIP }}
+          path: ${{ env.PLUGIN_ZIP }}
+          if-no-files-found: error
 
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ env.ZIP }}
+          files: ${{ env.PLUGIN_ZIP }}
+          fail_on_unmatched_files: true
           generate_release_notes: true
 
       - name: Update plugin repository manifest
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
-          CHECKSUM=$(md5sum "$ZIP" | cut -d' ' -f1)
-          SOURCE_URL="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/$ZIP"
+          CHECKSUM=$(md5sum < "$PLUGIN_ZIP" | cut -d' ' -f1)
+          test -n "$CHECKSUM"
+          SOURCE_URL="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/$PLUGIN_ZIP"
           CHANGELOG="https://github.com/$GITHUB_REPOSITORY/releases/tag/$GITHUB_REF_NAME"
           TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
@@ -111,7 +115,7 @@ jobs:
             | map(if .guid == entry.guid then
                 .versions = ([{version: $version, changelog: $changelog, targetAbi: $abi,
                                sourceUrl: $url, checksum: $checksum, timestamp: $ts}]
-                             + [.versions[] | select(.version != $version)])
+                             + [.versions[] | select(.version != $version and .checksum != "")])
               else . end)
           ' manifest.json > manifest.tmp && mv manifest.tmp manifest.json
 
