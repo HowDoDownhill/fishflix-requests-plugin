@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Requests</title>
+<style>
+  :root {
+    --bg: #101010;
+    --panel: #1c1c1c;
+    --panel-2: #242424;
+    --border: #2f2f2f;
+    --text: #e8e8e8;
+    --muted: #9a9a9a;
+    --accent: #00a4dc;
+    --pending: #e5a00d;
+    --processing: #8c7ae6;
+    --downloading: #00a4dc;
+    --partial: #4cb5ae;
+    --available: #4caf50;
+    --declined: #e05555;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--accent); }
+  header {
+    position: sticky; top: 0; z-index: 5;
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+    padding: 12px 16px; background: rgba(16,16,16,.95); border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 20px; margin: 0 8px 0 0; font-weight: 600; }
+  .back { color: var(--muted); text-decoration: none; font-size: 13px; }
+  .grow { flex: 1; }
+  input[type=search], select {
+    background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 7px 10px; font: inherit; min-width: 0;
+  }
+  button {
+    background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 7px 12px; font: inherit; cursor: pointer;
+  }
+  button:hover { border-color: #555; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { border-radius: 999px; padding: 4px 12px; font-size: 13px; }
+  .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 16px; padding: 16px; max-width: 1400px; margin: 0 auto; }
+  nav.users { position: sticky; top: 76px; align-self: start; max-height: calc(100vh - 92px); overflow: auto; }
+  .user-btn {
+    display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 8px;
+    text-align: left; margin-bottom: 4px; background: transparent; border-color: transparent;
+  }
+  .user-btn.active { background: var(--panel-2); border-color: var(--border); }
+  .user-btn .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .count { color: var(--muted); font-size: 12px; flex-shrink: 0; }
+  .you { font-size: 11px; color: var(--accent); margin-left: 4px; }
+  .user-select { display: none; width: 100%; }
+  section.group { margin-bottom: 28px; }
+  section.group h2 { font-size: 16px; margin: 0 0 10px; font-weight: 600; }
+  section.group h2 .summary { color: var(--muted); font-weight: 400; font-size: 13px; margin-left: 8px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
+  .card { display: flex; gap: 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px; }
+  .poster { width: 72px; height: 108px; flex-shrink: 0; border-radius: 6px; background: var(--panel-2) center/cover no-repeat; }
+  .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .title .year { color: var(--muted); font-weight: 400; }
+  .meta { color: var(--muted); font-size: 12px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .badge { border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
+  .status { font-size: 13px; font-weight: 600; }
+  .steps { display: flex; gap: 4px; }
+  .steps span { flex: 1; height: 5px; border-radius: 3px; background: var(--panel-2); }
+  .bar { height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; }
+  .bar > div { height: 100%; background: var(--downloading); transition: width .4s; }
+  details { font-size: 12px; color: var(--muted); }
+  details summary { cursor: pointer; }
+  details ul { margin: 4px 0 0; padding-left: 16px; }
+  .actions { display: flex; gap: 10px; font-size: 12px; margin-top: auto; }
+  .stage-PendingApproval { --c: var(--pending); }
+  .stage-Processing { --c: var(--processing); }
+  .stage-Downloading { --c: var(--downloading); }
+  .stage-PartiallyAvailable { --c: var(--partial); }
+  .stage-Available { --c: var(--available); }
+  .stage-Declined, .stage-Failed { --c: var(--declined); }
+  .card .status { color: var(--c); }
+  .card .steps span.on { background: var(--c); }
+  .message { padding: 48px 16px; text-align: center; color: var(--muted); }
+  .message.error { color: var(--declined); }
+  .updated { color: var(--muted); font-size: 12px; }
+  @media (max-width: 760px) {
+    .layout { grid-template-columns: 1fr; padding: 12px; }
+    nav.users { display: none; }
+    .user-select { display: block; margin-bottom: 12px; }
+    .cards { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <a class="back" href="../web/index.html" title="Back to Jellyfin">&larr; Jellyfin</a>
+  <h1>Requests</h1>
+  <div class="chips" id="stageChips"></div>
+  <div class="grow"></div>
+  <input type="search" id="search" placeholder="Search titles…" aria-label="Search titles">
+  <button id="refresh" title="Fetch the latest status from Jellyseerr">Refresh</button>
+  <span class="updated" id="updated"></span>
+</header>
+
+<div class="layout">
+  <nav class="users" id="userNav" aria-label="Users"></nav>
+  <main>
+    <select class="user-select" id="userSelect" aria-label="User"></select>
+    <div id="content"><div class="message">Loading requests…</div></div>
+  </main>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var STAGES = ['PendingApproval', 'Processing', 'Downloading', 'PartiallyAvailable', 'Available', 'Declined', 'Failed'];
+  // Stepper position for each stage: Requested, Approved, Downloading, Available.
+  var STEP = { PendingApproval: 1, Processing: 2, Downloading: 3, PartiallyAvailable: 3, Available: 4, Declined: 1, Failed: 2 };
+  var FILTERS = [
+    { id: 'all', label: 'All', match: function () { return true; } },
+    { id: 'active', label: 'In progress', match: function (r) { return r.stage === 'Processing' || r.stage === 'Downloading' || r.stage === 'PartiallyAvailable'; } },
+    { id: 'pending', label: 'Pending', match: function (r) { return r.stage === 'PendingApproval'; } },
+    { id: 'available', label: 'Available', match: function (r) { return r.stage === 'Available'; } },
+    { id: 'declined', label: 'Declined / failed', match: function (r) { return r.stage === 'Declined' || r.stage === 'Failed'; } }
+  ];
+
+  var state = { data: null, user: 'all', filter: 'all', search: '', token: null };
+  var el = function (id) { return document.getElementById(id); };
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    return isNaN(d) ? '' : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  function fmtEta(iso) {
+    if (!iso) return '';
+    var mins = Math.round((new Date(iso) - Date.now()) / 60000);
+    if (isNaN(mins) || mins <= 0) return '';
+    if (mins < 60) return mins + ' min left';
+    var h = Math.floor(mins / 60);
+    return h < 48 ? h + ' h ' + (mins % 60) + ' min left' : Math.round(h / 24) + ' days left';
+  }
+
+  // Find the access token the Jellyfin web client stored for this server.
+  function getToken() {
+    var creds;
+    try { creds = JSON.parse(localStorage.getItem('jellyfin_credentials') || '{}'); } catch (e) { creds = {}; }
+    var servers = (creds.Servers || []).filter(function (s) { return s.AccessToken; });
+    if (!servers.length) return Promise.resolve(null);
+    return fetch('../System/Info/Public')
+      .then(function (r) { return r.ok ? r.json() : {}; })
+      .catch(function () { return {}; })
+      .then(function (info) {
+        var match = servers.filter(function (s) { return info.Id && s.Id === info.Id; })[0];
+        return (match || servers[0]).AccessToken;
+      });
+  }
+
+  function load(refresh) {
+    el('refresh').disabled = true;
+    return fetch('Requests' + (refresh ? '?refresh=true' : ''), {
+      headers: { 'Authorization': 'MediaBrowser Token="' + state.token + '"', 'Accept': 'application/json' }
+    }).then(function (r) {
+      if (r.status === 401) throw { auth: true };
+      if (!r.ok) {
+        return r.json().catch(function () { return {}; }).then(function (p) {
+          throw new Error(p.detail || p.title || ('Request failed (' + r.status + ')'));
+        });
+      }
+      return r.json();
+    }).then(function (data) {
+      state.data = data;
+      if (state.user !== 'all' && !data.users.some(function (u) { return String(u.jellyseerrUserId) === state.user; })) {
+        state.user = 'all';
+      }
+      if (!data.canViewAll && data.users.length) state.user = String(data.users[0].jellyseerrUserId);
+      el('updated').textContent = 'Updated ' + new Date(data.generatedAt).toLocaleTimeString();
+      render();
+    }).catch(function (err) {
+      if (err && err.auth) return showSignIn();
+      if (!state.data) {
+        el('content').innerHTML = '<div class="message error">' + esc(err.message || err) + '</div>';
+      } else {
+        el('updated').textContent = 'Update failed: ' + (err.message || err);
+      }
+    }).then(function () { el('refresh').disabled = false; });
+  }
+
+  function showSignIn() {
+    el('content').innerHTML = '<div class="message">You need to be signed in to Jellyfin in this browser.<br><br>' +
+      '<a href="../web/index.html">Sign in to Jellyfin</a>, then come back to this page.</div>';
+  }
+
+  function visibleRequests(user) {
+    var f = FILTERS.filter(function (x) { return x.id === state.filter; })[0];
+    var q = state.search.toLowerCase();
+    return user.requests.filter(function (r) {
+      return f.match(r) && (!q || r.title.toLowerCase().indexOf(q) !== -1);
+    });
+  }
+
+  function renderChips() {
+    el('stageChips').innerHTML = FILTERS.map(function (f) {
+      return '<button class="chip' + (f.id === state.filter ? ' active' : '') + '" data-filter="' + f.id + '">' + esc(f.label) + '</button>';
+    }).join('');
+  }
+
+  function renderUsers(users) {
+    var total = users.reduce(function (n, u) { return n + u.requests.length; }, 0);
+    var items = [];
+    if (state.data.canViewAll) items.push({ id: 'all', name: 'Everyone', count: total });
+    users.forEach(function (u) {
+      items.push({ id: String(u.jellyseerrUserId), name: u.displayName, count: u.requests.length, you: u.isCurrentUser });
+    });
+
+    el('userNav').innerHTML = items.map(function (i) {
+      return '<button class="user-btn' + (i.id === state.user ? ' active' : '') + '" data-user="' + esc(i.id) + '">' +
+        '<span class="name">' + esc(i.name) + (i.you ? '<span class="you">you</span>' : '') + '</span>' +
+        '<span class="count">' + i.count + '</span></button>';
+    }).join('');
+
+    el('userSelect').innerHTML = items.map(function (i) {
+      return '<option value="' + esc(i.id) + '"' + (i.id === state.user ? ' selected' : '') + '>' +
+        esc(i.name) + (i.you ? ' (you)' : '') + ' — ' + i.count + '</option>';
+    }).join('');
+  }
+
+  function renderCard(r) {
+    var step = STEP[r.stage] || 1;
+    var steps = '';
+    for (var i = 1; i <= 4; i++) steps += '<span class="' + (i <= step ? 'on' : '') + '"></span>';
+
+    var badges = '<span class="badge">' + (r.mediaType === 'tv' ? 'Series' : 'Movie') + '</span>';
+    if (r.is4k) badges += '<span class="badge">4K</span>';
+    if (r.seasons && r.seasons.length) {
+      badges += '<span>' + (r.seasons.length === 1 ? 'Season ' + r.seasons[0] : 'Seasons ' + r.seasons.join(', ')) + '</span>';
+    }
+
+    var progress = '';
+    if (r.downloadPercent != null) {
+      var eta = r.downloads.map(function (d) { return d.estimatedCompletionTime; }).filter(Boolean).sort().pop();
+      progress = '<div class="bar" title="' + r.downloadPercent + '%"><div style="width:' + r.downloadPercent + '%"></div></div>' +
+        '<div class="meta">' + r.downloads.length + ' download' + (r.downloads.length === 1 ? '' : 's') +
+        (fmtEta(eta) ? ' · ' + fmtEta(eta) : '') + '</div>';
+      if (r.downloads.length > 1) {
+        progress += '<details><summary>Show downloads</summary><ul>' + r.downloads.map(function (d) {
+          return '<li>' + esc(d.title) + ' — ' + d.percent + '%' + (d.status ? ' (' + esc(d.status) + ')' : '') + '</li>';
+        }).join('') + '</ul></details>';
+      }
+    }
+
+    var actions = [];
+    if (r.jellyfinItemId) actions.push('<a href="../web/index.html#/details?id=' + encodeURIComponent(r.jellyfinItemId) + '" target="_top">Watch in Jellyfin</a>');
+    if (state.data.jellyseerrUrl && r.tmdbId) {
+      actions.push('<a href="' + esc(state.data.jellyseerrUrl) + '/' + (r.mediaType === 'tv' ? 'tv' : 'movie') + '/' + r.tmdbId + '" target="_blank" rel="noopener">Jellyseerr</a>');
+    }
+
+    return '<article class="card stage-' + esc(r.stage) + '">' +
+      '<div class="poster"' + (r.posterUrl ? ' style="background-image:url(\'' + esc(r.posterUrl) + '\')"' : '') + '></div>' +
+      '<div class="body">' +
+        '<div class="title" title="' + esc(r.title) + '">' + esc(r.title) + (r.year ? ' <span class="year">(' + esc(r.year) + ')</span>' : '') + '</div>' +
+        '<div class="meta">' + badges + '<span>Requested ' + esc(fmtDate(r.requestedAt)) + '</span></div>' +
+        '<div class="status">' + esc(r.statusText) + '</div>' +
+        '<div class="steps" title="Requested → Approved → Downloading → Available">' + steps + '</div>' +
+        progress +
+        (actions.length ? '<div class="actions">' + actions.join('') + '</div>' : '') +
+      '</div></article>';
+  }
+
+  function summary(user) {
+    var c = user.counts || {};
+    var parts = [];
+    if (c.PendingApproval) parts.push(c.PendingApproval + ' pending');
+    var active = (c.Processing || 0) + (c.Downloading || 0) + (c.PartiallyAvailable || 0);
+    if (active) parts.push(active + ' in progress');
+    if (c.Available) parts.push(c.Available + ' available');
+    return parts.join(' · ');
+  }
+
+  function render() {
+    var data = state.data;
+    renderChips();
+    renderUsers(data.users);
+
+    var users = data.users.filter(function (u) { return state.user === 'all' || String(u.jellyseerrUserId) === state.user; });
+    var html = users.map(function (u) {
+      var reqs = visibleRequests(u);
+      if (!reqs.length && state.user === 'all') return '';
+      return '<section class="group"><h2>' + esc(u.displayName) + '<span class="summary">' + esc(summary(u)) + '</span></h2>' +
+        (reqs.length
+          ? '<div class="cards">' + reqs.map(renderCard).join('') + '</div>'
+          : '<div class="message">No matching requests.</div>') +
+        '</section>';
+    }).join('');
+
+    if (!html) {
+      html = data.users.length
+        ? '<div class="message">No matching requests.</div>'
+        : '<div class="message">No requests yet' + (data.canViewAll ? '' : ', or your Jellyfin account is not linked to a Jellyseerr user') + '.</div>';
+    }
+    el('content').innerHTML = html;
+  }
+
+  function onClick(e) {
+    var t = e.target.closest('[data-filter],[data-user]');
+    if (!t) return;
+    if (t.dataset.filter) state.filter = t.dataset.filter;
+    if (t.dataset.user) state.user = t.dataset.user;
+    if (state.data) render();
+  }
+
+  document.addEventListener('click', onClick);
+  el('userSelect').addEventListener('change', function (e) { state.user = e.target.value; render(); });
+  el('search').addEventListener('input', function (e) { state.search = e.target.value.trim(); if (state.data) render(); });
+  el('refresh').addEventListener('click', function () { load(true); });
+  renderChips();
+
+  getToken().then(function (token) {
+    if (!token) return showSignIn();
+    state.token = token;
+    load(false);
+    setInterval(function () { if (!document.hidden) load(false); }, 60000);
+  });
+})();
+</script>
+</body>
+</html>

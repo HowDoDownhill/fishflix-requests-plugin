@@ -1,0 +1,16 @@
+<div id="FishflixRequestsDashboardPage" data-role="page" class="page type-interior pluginConfigurationPage">
+    <div data-role="content">
+        <div class="content-primary" style="padding: 0;">
+            <iframe id="fishflixRequestsFrame" title="Requests"
+                    style="width: 100%; height: calc(100vh - 7em); border: 0; display: block;"></iframe>
+        </div>
+    </div>
+    <script type="text/javascript">
+        document.querySelector('#FishflixRequestsDashboardPage').addEventListener('pageshow', function () {
+            var frame = document.querySelector('#fishflixRequestsFrame');
+            if (!frame.getAttribute('src')) {
+                frame.setAttribute('src', ApiClient.getUrl('FishflixRequests/Page'));
+            }
+        });
+    </script>
+</div>
