@@ -9,6 +9,9 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: build-${{ github.ref }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -19,16 +22,30 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      - name: Version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            # v1.2 -> 1.2.0.0, v1.2.3 -> 1.2.3.0
+            IFS=. read -r a b c d <<< "${GITHUB_REF_NAME#v}"
+            VERSION="${a:-0}.${b:-0}.${c:-0}.${d:-0}"
+          else
+            VERSION=$(grep -oP '(?<=^version: ")[^"]+' build.yaml)
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "ABI=$(grep -oP '(?<=^targetAbi: ")[^"]+' build.yaml)" >> "$GITHUB_ENV"
+          echo "ZIP=fishflix-requests_$VERSION.zip" >> "$GITHUB_ENV"
+
       - name: Test
         run: dotnet test Jellyfin.Plugin.FishflixRequests.slnx --configuration Release
 
       - name: Publish
-        run: dotnet publish Jellyfin.Plugin.FishflixRequests/Jellyfin.Plugin.FishflixRequests.csproj --configuration Release --output publish
+        run: >
+          dotnet publish Jellyfin.Plugin.FishflixRequests/Jellyfin.Plugin.FishflixRequests.csproj
+          --configuration Release --output publish
+          -p:Version=$VERSION -p:AssemblyVersion=$VERSION -p:FileVersion=$VERSION
 
       - name: Package
         run: |
-          VERSION=$(grep -oP '(?<=^version: ")[^"]+' build.yaml)
-          ABI=$(grep -oP '(?<=^targetAbi: ")[^"]+' build.yaml)
           mkdir -p package
           cp publish/Jellyfin.Plugin.FishflixRequests.dll package/
           cat > package/meta.json <<JSON
@@ -44,12 +61,11 @@ jobs:
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "version": "$VERSION",
             "status": "Active",
-            "autoUpdate": false,
+            "autoUpdate": true,
             "assemblies": ["Jellyfin.Plugin.FishflixRequests.dll"]
           }
           JSON
-          (cd package && zip -r ../fishflix-requests_$VERSION.zip .)
-          echo "ZIP=fishflix-requests_$VERSION.zip" >> "$GITHUB_ENV"
+          (cd package && zip -r "../$ZIP" .)
 
       - uses: actions/upload-artifact@v4
         with:
@@ -61,3 +77,46 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ env.ZIP }}
+          generate_release_notes: true
+
+      - name: Update plugin repository manifest
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          CHECKSUM=$(md5sum "$ZIP" | cut -d' ' -f1)
+          SOURCE_URL="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/$ZIP"
+          CHANGELOG="https://github.com/$GITHUB_REPOSITORY/releases/tag/$GITHUB_REF_NAME"
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          # The manifest lives on its own branch so main can stay protected.
+          if git fetch origin manifest:refs/remotes/origin/manifest; then
+            git checkout -B manifest origin/manifest
+          else
+            git checkout --orphan manifest
+            git rm -rqf .
+            echo '[]' > manifest.json
+          fi
+
+          jq --arg version "$VERSION" --arg abi "$ABI" --arg url "$SOURCE_URL" \
+             --arg checksum "$CHECKSUM" --arg changelog "$CHANGELOG" --arg ts "$TIMESTAMP" '
+            def entry: {
+              guid: "40dc34ee-7e8d-4ebc-b34d-cc1253f07de0",
+              name: "Fishflix Requests",
+              description: "Shows every Jellyseerr/Overseerr request grouped by the user who made it, with its status and live download progress from Sonarr/Radarr.",
+              overview: "View Jellyseerr requests by user and track their progress",
+              owner: "HowDoDownhill",
+              category: "General",
+              versions: []
+            };
+            (if any(.[]; .guid == entry.guid) then . else . + [entry] end)
+            | map(if .guid == entry.guid then
+                .versions = ([{version: $version, changelog: $changelog, targetAbi: $abi,
+                               sourceUrl: $url, checksum: $checksum, timestamp: $ts}]
+                             + [.versions[] | select(.version != $version)])
+              else . end)
+          ' manifest.json > manifest.tmp && mv manifest.tmp manifest.json
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          git commit -m "Publish $GITHUB_REF_NAME to plugin repository"
+          git push origin manifest
