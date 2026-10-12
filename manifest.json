@@ -1,0 +1,20 @@
+[
+  {
+    "guid": "40dc34ee-7e8d-4ebc-b34d-cc1253f07de0",
+    "name": "Fishflix Requests",
+    "description": "Shows every Jellyseerr/Overseerr request grouped by the user who made it, with its status and live download progress from Sonarr/Radarr.",
+    "overview": "View Jellyseerr requests by user and track their progress",
+    "owner": "HowDoDownhill",
+    "category": "General",
+    "versions": [
+      {
+        "version": "1.0.0.0",
+        "changelog": "https://github.com/HowDoDownhill/fishflix-requests-plugin/releases/tag/v1.0.0",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/HowDoDownhill/fishflix-requests-plugin/releases/download/v1.0.0/fishflix-requests_1.0.0.0.zip",
+        "checksum": "",
+        "timestamp": "2026-10-12T19:01:55Z"
+      }
+    ]
+  }
+]
