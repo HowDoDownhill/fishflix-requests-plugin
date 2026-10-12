@@ -19,7 +19,7 @@ Built for **Jellyfin 12.x** (.NET 10).
 
 1. In Jellyfin, go to Dashboard → Plugins → **Repositories** (the gear or "Manage repositories" button, depending on version) and add:
    - **Name:** `Fishflix`
-   - **URL:** `https://raw.githubusercontent.com/HowDoDownhill/fishflix-requests-plugin/main/manifest.json`
+   - **URL:** `https://raw.githubusercontent.com/HowDoDownhill/fishflix-requests-plugin/manifest/manifest.json`
 2. Go to the plugin **Catalog**, find **Fishflix Requests** and install it.
 3. Restart Jellyfin.
 
@@ -83,4 +83,4 @@ Push a version tag, e.g. `git tag v1.1.0 && git push origin v1.1.0`. The **Build
 
 1. builds and tests the plugin with that version number,
 2. attaches `fishflix-requests_1.1.0.0.zip` to a GitHub release, and
-3. adds the version to `manifest.json` on `main`, so Jellyfin servers that use the repository see the update.
+3. adds the version to `manifest.json` on the `manifest` branch (created on the first release), so Jellyfin servers that use the repository see the update.
