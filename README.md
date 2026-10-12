@@ -17,9 +17,15 @@ Built for **Jellyfin 12.x** (.NET 10).
 
 ## Install
 
-1. Download `fishflix-requests_<version>.zip` from the latest GitHub release (or from the build artifact of the **Build** workflow).
-2. Unzip it into a new folder in your Jellyfin plugins directory, e.g. `/config/plugins/FishflixRequests_1.0.0.0/` in the official Docker image.
+1. In Jellyfin, go to Dashboard → Plugins → **Repositories** (the gear or "Manage repositories" button, depending on version) and add:
+   - **Name:** `Fishflix`
+   - **URL:** `https://raw.githubusercontent.com/HowDoDownhill/fishflix-requests-plugin/main/manifest.json`
+2. Go to the plugin **Catalog**, find **Fishflix Requests** and install it.
 3. Restart Jellyfin.
+
+New versions show up as updates in the same place.
+
+To install by hand instead, download `fishflix-requests_<version>.zip` from the latest GitHub release, unzip it into a new folder in your Jellyfin plugins directory (e.g. `/config/plugins/FishflixRequests_1.0.0.0/` in the official Docker image), and restart Jellyfin.
 
 ## Configure
 
@@ -69,4 +75,12 @@ dotnet test Jellyfin.Plugin.FishflixRequests.slnx
 dotnet publish Jellyfin.Plugin.FishflixRequests -c Release -o publish
 ```
 
-The DLL in `publish/` is the plugin. Pushing a `v*` tag makes the **Build** workflow attach a ready-to-install zip to a GitHub release.
+The DLL in `publish/` is the plugin.
+
+## Releasing
+
+Push a version tag, e.g. `git tag v1.1.0 && git push origin v1.1.0`. The **Build** workflow then:
+
+1. builds and tests the plugin with that version number,
+2. attaches `fishflix-requests_1.1.0.0.zip` to a GitHub release, and
+3. adds the version to `manifest.json` on `main`, so Jellyfin servers that use the repository see the update.
