@@ -1,0 +1,17 @@
+---
+name: "Fishflix Requests"
+guid: "40dc34ee-7e8d-4ebc-b34d-cc1253f07de0"
+version: "1.0.0.0"
+targetAbi: "12.0.0.0"
+framework: "net10.0"
+overview: "View Jellyseerr requests by user and track their progress"
+description: >
+  Shows every Jellyseerr/Overseerr request grouped by the user who made it,
+  with its status (pending, approved, downloading, available) and live
+  download progress from Sonarr/Radarr.
+category: "General"
+owner: "HowDoDownhill"
+artifacts:
+  - "Jellyfin.Plugin.FishflixRequests.dll"
+changelog: >
+  Initial release.

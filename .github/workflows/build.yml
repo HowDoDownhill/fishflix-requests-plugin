@@ -1,0 +1,63 @@
+name: Build
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Test
+        run: dotnet test Jellyfin.Plugin.FishflixRequests.slnx --configuration Release
+
+      - name: Publish
+        run: dotnet publish Jellyfin.Plugin.FishflixRequests/Jellyfin.Plugin.FishflixRequests.csproj --configuration Release --output publish
+
+      - name: Package
+        run: |
+          VERSION=$(grep -oP '(?<=^version: ")[^"]+' build.yaml)
+          ABI=$(grep -oP '(?<=^targetAbi: ")[^"]+' build.yaml)
+          mkdir -p package
+          cp publish/Jellyfin.Plugin.FishflixRequests.dll package/
+          cat > package/meta.json <<JSON
+          {
+            "category": "General",
+            "changelog": "",
+            "description": "View Jellyseerr requests by user and track their progress.",
+            "guid": "40dc34ee-7e8d-4ebc-b34d-cc1253f07de0",
+            "name": "Fishflix Requests",
+            "overview": "View Jellyseerr requests by user and track their progress",
+            "owner": "HowDoDownhill",
+            "targetAbi": "$ABI",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "version": "$VERSION",
+            "status": "Active",
+            "autoUpdate": false,
+            "assemblies": ["Jellyfin.Plugin.FishflixRequests.dll"]
+          }
+          JSON
+          (cd package && zip -r ../fishflix-requests_$VERSION.zip .)
+          echo "ZIP=fishflix-requests_$VERSION.zip" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fishflix-requests
+          path: ${{ env.ZIP }}
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ZIP }}
